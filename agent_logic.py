@@ -8,7 +8,8 @@
 import json
 import time
 import re
-import google.generativeai as genai
+import os
+import requests
 from definitions import PARAMETER_DEFINITIONS
 
 
@@ -100,59 +101,67 @@ Start your response with [ and end with ]. Return ONLY the JSON array.
 # Gemini API Call
 # ---------------------------------------------------------------------------
 
-def configure_gemini(api_key: str):
-    """Configure the Gemini SDK with the provided API key."""
-    genai.configure(api_key=api_key)
+# Gemini SDK removed, using LLM Gateway generic HTTP call instead
+# ---------------------------------------------------------------------------
+
+API_URL = os.getenv("LLM_GATEWAY_URL", "https://imllm.intermesh.net/v1/chat/completions")
 
 
-def call_gemini(
+def call_llm(
     api_key: str,
     transcript: str,
     filtered_json: dict,
-    model_name: str = "gemini-2.5-flash",
+    model_name: str = "google/gemini-2.5-flash",
     max_retries: int = 3,
     retry_delay: float = 5.0,
 ) -> list[dict]:
     """
-    Call the Gemini API and return parsed QA results.
+    Call the AI via HTTP gateway and return parsed QA results.
 
     Args:
-        api_key: Gemini API key string.
+        api_key: The LLM gateway API key.
         transcript: Full call transcript text.
         filtered_json: Dict of the 12 parameters (already filtered).
-        model_name: Gemini model to use.
+        model_name: The full model name strings to pass.
         max_retries: Number of retries on transient failures.
         retry_delay: Seconds to wait between retries.
 
     Returns:
-        List of dicts, each containing:
-          {parameter, extracted_value, transcript_context, verdict, reason}
-
-    Raises:
-        RuntimeError on unrecoverable API errors.
+        List of dicts containing parsed evaluation.
     """
-    configure_gemini(api_key)
-
-    generation_config = genai.GenerationConfig(
-        temperature=0.1,               # Low temperature for deterministic QA
-        max_output_tokens=8192,        # Enough for 12 params with context
-        response_mime_type="application/json",  # Forces Gemini to output valid JSON
-    )
-
-    model = genai.GenerativeModel(
-        model_name=model_name,
-        system_instruction=SYSTEM_INSTRUCTION,
-        generation_config=generation_config,
-    )
+    if not api_key:
+        raise RuntimeError("API Key is missing for the LLM Gateway.")
 
     prompt = build_prompt(transcript, filtered_json)
-    raw_text = ""
 
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    payload = {
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": SYSTEM_INSTRUCTION},
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 8192
+    }
+
+    url = API_URL
+    if "/chat/completions" not in url:
+        url = f"{url.rstrip('/')}/chat/completions"
+
+    raw_text = ""
     last_error = None
     for attempt in range(1, max_retries + 1):
         try:
-            response = model.generate_content(prompt)
-            raw_text = response.text.strip()
+            response = requests.post(url, headers=headers, json=payload, timeout=60)
+            if response.status_code != 200:
+                raise RuntimeError(f"HTTP Error {response.status_code}: {response.text}")
+                
+            data = response.json()
+            raw_text = data["choices"][0]["message"]["content"].strip()
             parsed = _parse_response(raw_text)
             return parsed
 
@@ -173,7 +182,7 @@ def call_gemini(
                 time.sleep(retry_delay * attempt)
             else:
                 raise RuntimeError(
-                    f"Gemini API call failed after {max_retries} attempts. "
+                    f"LLM API call failed after {max_retries} attempts. "
                     f"Last error: {api_err}"
                 )
 
@@ -430,7 +439,7 @@ def process_file_id(
         return [], f"file_id {file_id}: No parameters found in Extracted JSON."
 
     try:
-        results = call_gemini(
+        results = call_llm(
             api_key=api_key,
             transcript=transcript,
             filtered_json=filtered_json,

@@ -291,7 +291,7 @@ hr { border-color: rgba(139,92,246,0.15) !important; margin: 28px 0 !important; 
 # ──────────────────────────────────────────────────────────────────────────────
 # API KEY
 # ──────────────────────────────────────────────────────────────────────────────
-API_KEY = os.getenv("GEMINI_API_KEY", "")
+API_KEY = os.getenv("LLM_GATEWAY_API_KEY", "")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # SESSION STATE
@@ -468,8 +468,9 @@ with st.sidebar:
                     f'<code style="font-size:0.78rem">{masked}</code></div>',
                     unsafe_allow_html=True)
     else:
-        st.markdown('<div class="key-missing">⚠️ GEMINI_API_KEY not found in .env<br>'
-                    'Add: <code>GEMINI_API_KEY=your_key</code></div>',
+        st.markdown('<div class="key-missing">⚠️ LLM_GATEWAY_API_KEY not found in .env<br>'
+                    'Add: <code>LLM_GATEWAY_API_KEY=your_key</code></div>',
+
                     unsafe_allow_html=True)
 
     st.divider()
@@ -632,7 +633,7 @@ ready       = bool(data_df is not None and all_fids and API_KEY)
 if data_df is None:
     st.warning("⬅️ Upload your input file in the sidebar.", icon="📂")
 elif not API_KEY:
-    st.warning("⚠️ GEMINI_API_KEY missing from .env", icon="🔑")
+    st.warning("⚠️ LLM_GATEWAY_API_KEY missing from .env", icon="🔑")
 
 # ── Mode toggle ────────────────────────────────────────────────────────────────
 auto_mode = st.toggle(
