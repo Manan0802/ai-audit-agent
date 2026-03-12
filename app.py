@@ -739,13 +739,18 @@ else:
         )
     with ctrl2:
         st.markdown("<br>", unsafe_allow_html=True)
-        start_batch = st.button(
+        btn_ph = st.empty()
+        start_batch = btn_ph.button(
             "🚀 Start Auto Processing",
             disabled=not ready or not pending_ids,
             key="btn_batch",
         )
 
     if start_batch and ready and pending_ids:
+        # Swamp in a Stop Button during execution
+        # (clicking it causes a restart logic where start_batch is False)
+        btn_ph.button("🛑 Stop Auto Processing", key="btn_stop", help="Click to safely halt the batch process")
+        
         n = len(pending_ids)
         progress_bar = st.progress(0, text="Starting…")
         status_box   = st.empty()
